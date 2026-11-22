@@ -81,7 +81,7 @@ jobs:
       - name: Lighthouse CI (LCP ≤ 2,5 с, CLS ≤ 0,1)
         run: pnpm lhci
       - name: Trivy — вразливості образу
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: reform-monitor:ci
           severity: CRITICAL,HIGH
