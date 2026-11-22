@@ -1,0 +1,284 @@
+@import 'tailwindcss';
+
+/* static: змінні статусів використовуються через var() в inline-стилях, тому не повинні вирізатися */
+@theme static {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* Нейтральна палітра: синій + бурштиновий акцент. Контраст тексту ≥ 4,5:1. */
+  --color-bg: #f5f7fa;
+  --color-surface: #ffffff;
+  --color-ink: #0f1b2d;
+  --color-muted: #475467;
+  --color-line: #d9dee7;
+  --color-brand: #1d4ed8;
+  --color-brand-strong: #1e3a8a;
+  --color-brand-soft: #eef3ff;
+  --color-accent: #f59e0b;
+  --color-accent-ink: #8a4b08;
+  --color-accent-soft: #fef3c7;
+  --color-footer: #0f1b2d;
+
+  /* Статуси: текст на тонованому тлі (≥ 4,5:1) і окремий колір заливки для діаграм */
+  --color-done: #166534;
+  --color-done-soft: #dcfce7;
+  --color-done-fill: #15803d;
+  --color-partial: #854d0e;
+  --color-partial-soft: #fef3c7;
+  --color-partial-fill: #eda100;
+  --color-in_progress: #1e40af;
+  --color-in_progress-soft: #dbeafe;
+  --color-in_progress-fill: #2a78d6;
+  --color-not_started: #344054;
+  --color-not_started-soft: #eaecf0;
+  --color-not_started-fill: #8492a6;
+  --color-overdue: #991b1b;
+  --color-overdue-soft: #fee2e2;
+  --color-overdue-fill: #d03b3b;
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    line-height: 1.55;
+    overflow-wrap: break-word;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    text-wrap: balance;
+  }
+  /* Видимий фокус для клавіатури: двоколірне кільце, помітне на світлому й темному тлі */
+  :focus-visible {
+    outline: 3px solid var(--color-brand-strong);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 5px #ffffff;
+    border-radius: 4px;
+  }
+  .on-dark :focus-visible {
+    outline-color: #ffffff;
+    box-shadow: 0 0 0 5px var(--color-brand-strong);
+  }
+  ::selection {
+    background: var(--color-accent-soft);
+  }
+}
+
+@layer components {
+  .container-page {
+    width: 100%;
+    max-width: 72rem;
+    margin-inline: auto;
+    padding-inline: 1rem;
+  }
+  @media (min-width: 640px) {
+    .container-page {
+      padding-inline: 1.5rem;
+    }
+  }
+  .prose-measure {
+    max-width: 65ch;
+  }
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+  .link {
+    color: var(--color-brand);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+    transition: color 150ms ease;
+  }
+  .card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: 0.875rem;
+  }
+  /* Картка-посилання: вся картка клікабельна через псевдоелемент посилання в заголовку */
+  .card-link {
+    position: relative;
+    transition:
+      border-color 180ms ease,
+      box-shadow 180ms ease,
+      transform 180ms var(--ease-out);
+  }
+  .card-link a.stretched::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+  }
+  .card-link:focus-within {
+    border-color: var(--color-brand);
+  }
+  .card-link:active {
+    transform: scale(0.99);
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.625rem;
+    font-weight: 600;
+    font-size: 0.9375rem;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition:
+      transform 160ms var(--ease-out),
+      background-color 150ms ease,
+      border-color 150ms ease;
+  }
+  .btn:active {
+    transform: scale(0.97);
+  }
+  .btn-primary {
+    background: var(--color-brand);
+    color: #ffffff;
+  }
+  .btn-secondary {
+    background: var(--color-surface);
+    color: var(--color-ink);
+    border-color: var(--color-line);
+  }
+  .field {
+    min-height: 2.75rem;
+    width: 100%;
+    padding: 0.5rem 2.25rem 0.5rem 0.75rem;
+    border: 1px solid #98a2b3;
+    border-radius: 0.625rem;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-size: 1rem;
+  }
+  .rich p + p,
+  .rich ul,
+  .rich ol {
+    margin-top: 0.875rem;
+  }
+  .rich ul {
+    list-style: disc;
+    padding-left: 1.25rem;
+  }
+  .rich ol {
+    list-style: decimal;
+    padding-left: 1.25rem;
+  }
+  .rich a {
+    color: var(--color-brand);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .rich h2,
+  .rich h3 {
+    font-weight: 700;
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 1.25rem;
+  }
+
+  /* Панель акордеона: легка поява вмісту (лише opacity/transform) */
+  .acc-panel {
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity 200ms var(--ease-out),
+      transform 200ms var(--ease-out);
+  }
+  @starting-style {
+    .acc-panel {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+  }
+  .acc-chevron {
+    transition: transform 200ms var(--ease-out);
+  }
+  [aria-expanded='true'] > .acc-chevron {
+    transform: rotate(180deg);
+  }
+
+  /* Кільце прогресу заповнюється один раз при завантаженні */
+  .ring-value {
+    animation: ring-in 900ms var(--ease-out) both;
+  }
+  .bar-value {
+    transform-origin: left center;
+    animation: bar-in 700ms var(--ease-out) both;
+  }
+}
+
+@keyframes ring-in {
+  from {
+    stroke-dashoffset: var(--ring-circumference);
+  }
+}
+@keyframes bar-in {
+  from {
+    transform: scaleX(0.02);
+  }
+}
+
+/* Hover-ефекти лише для пристроїв із курсором */
+@media (hover: hover) and (pointer: fine) {
+  .link:hover {
+    color: var(--color-brand-strong);
+  }
+  .card-link:hover {
+    border-color: #9db4f5;
+    box-shadow: 0 6px 20px -12px rgb(15 27 45 / 0.35);
+  }
+  .btn-primary:hover {
+    background: var(--color-brand-strong);
+  }
+  .btn-secondary:hover {
+    border-color: #98a2b3;
+    background: #f9fafb;
+  }
+  .nav-link:hover {
+    background: var(--color-brand-soft);
+    color: var(--color-brand-strong);
+  }
+}
+
+/* Менше руху: прибираємо переміщення, лишаємо миттєві зміни стану */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .ring-value,
+  .bar-value {
+    animation: none;
+  }
+  .acc-panel,
+  .acc-chevron,
+  .btn,
+  .card-link {
+    transition-duration: 0.01ms;
+  }
+  @starting-style {
+    .acc-panel {
+      transform: none;
+    }
+  }
+}
+
+@media (forced-colors: active) {
+  .ring-value,
+  .bar-value {
+    forced-color-adjust: none;
+  }
+}

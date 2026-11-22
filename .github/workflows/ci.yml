@@ -1,0 +1,170 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  # 1. Статичні перевірки та unit-тести
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: Gitleaks — пошук секретів у репозиторії
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 2. Збірка образу, запуск стеку, Playwright + axe, Lighthouse, Trivy
+  e2e:
+    runs-on: ubuntu-latest
+    needs: check
+    env:
+      POSTGRES_USER: reform
+      POSTGRES_PASSWORD: ci-password
+      POSTGRES_DB: reform_monitor
+      PAYLOAD_SECRET: ci-secret-not-used-in-production
+      SITE_URL: http://localhost:3000
+      ADMIN_EMAIL: admin@example.com
+      ADMIN_PASSWORD: ci-admin-password
+      SEED_ON_START: "true"
+      ENABLE_JOBS: "false"
+      APP_IMAGE: reform-monitor:ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Збірка образу
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: reform-monitor:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Запуск стеку (db + app)
+        run: |
+          docker compose up -d --no-build --wait --wait-timeout 180
+          docker compose ps
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Playwright + axe (порушення доступності блокують деплой)
+        run: pnpm test:e2e
+        env:
+          BASE_URL: http://localhost:3000
+      - name: Lighthouse CI (LCP ≤ 2,5 с, CLS ≤ 0,1)
+        run: pnpm lhci
+      - name: Trivy — вразливості образу
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: reform-monitor:ci
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Логи застосунку
+        if: failure()
+        run: docker compose logs --tail 200
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reports
+          path: |
+            playwright-report/
+            .lighthouseci/
+          if-no-files-found: ignore
+
+  # 3. Публікація образу в GHCR — лише з main і лише після успішних тестів
+  publish:
+    runs-on: ubuntu-latest
+    needs: [check, e2e]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: meta
+        run: |
+          echo "image=$(echo "$IMAGE" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+          echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
+            ${{ steps.meta.outputs.image }}:latest
+          cache-from: type=gha
+
+  # 4. Деплой на VPS по SSH. Не виконується, якщо будь-який попередній крок упав.
+  deploy:
+    runs-on: ubuntu-latest
+    needs: publish
+    if: vars.DEPLOY_ENABLED == 'true'
+    environment: production
+    concurrency: deploy-production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Оновлення compose-файлів на сервері
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "docker-compose.yml,Caddyfile,scripts/backup.sh,scripts/restore.sh"
+          target: /opt/reform-monitor
+      - name: docker compose pull && up -d
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          APP_IMAGE: ${{ needs.publish.outputs.image }}:${{ needs.publish.outputs.tag }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: APP_IMAGE
+          script: |
+            set -eu
+            cd /opt/reform-monitor
+            # Попередній тег зберігається для відкату
+            grep '^APP_IMAGE=' .env | sed 's/^APP_IMAGE=/PREVIOUS_APP_IMAGE=/' > .previous-image || true
+            sed -i "s|^APP_IMAGE=.*|APP_IMAGE=${APP_IMAGE}|" .env
+            docker compose --profile prod pull app
+            # --wait: команда завершиться помилкою, якщо новий контейнер не став healthy
+            docker compose --profile prod up -d --no-build --wait --wait-timeout 180
+            docker image prune -f
+            docker compose --profile prod ps

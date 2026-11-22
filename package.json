@@ -1,0 +1,72 @@
+{
+  "name": "reform-monitor",
+  "version": "0.1.0",
+  "description": "Монітор реформ: Глави 23 і 24 — незалежний демонстраційний проєкт (Next.js + Payload CMS + PostgreSQL)",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.34.9",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "payload": "payload",
+    "generate:types": "payload generate:types",
+    "generate:importmap": "payload generate:importmap",
+    "seed": "payload run src/seed/cli.ts",
+    "migrate:sheets": "payload run src/sync/cli.ts",
+    "lhci": "lhci autorun"
+  },
+  "dependencies": {
+    "@payloadcms/db-postgres": "3.94.1",
+    "@payloadcms/next": "3.94.1",
+    "@payloadcms/richtext-lexical": "3.94.1",
+    "@payloadcms/translations": "3.94.1",
+    "@payloadcms/ui": "3.94.1",
+    "graphql": "^16.8.1",
+    "next": "16.4.6",
+    "next-intl": "4.15.3",
+    "papaparse": "5.7.1",
+    "payload": "3.94.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "recharts": "3.11.0",
+    "server-only": "^0.0.1",
+    "sharp": "0.35.5"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@lhci/cli": "0.16.1",
+    "@playwright/test": "1.65.1",
+    "@tailwindcss/postcss": "4.3.5",
+    "@types/node": "^22.10.0",
+    "@types/papaparse": "^5.3.15",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.4.6",
+    "postcss": "^8.5.0",
+    "tailwindcss": "4.3.5",
+    "typescript": "5.9.3",
+    "vitest": "5.1.1"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "sharp",
+      "esbuild",
+      "unrs-resolver"
+    ],
+    "overrides": {
+      "sharp": "0.35.5",
+      "postcss": "^8.5.12",
+      "picomatch@>=4.0.0 <4.0.4": "^4.0.4"
+    }
+  }
+}

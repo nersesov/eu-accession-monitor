@@ -1,0 +1,16 @@
+node_modules/
+.next/
+.env
+.env.*
+!.env.example
+media/
+backups/
+playwright-report/
+test-results/
+.lighthouseci/
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store
+.pnpm-store/
+# Робочі документи, не для публікації
+TZ_*.md

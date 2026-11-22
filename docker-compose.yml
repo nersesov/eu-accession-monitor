@@ -1,0 +1,125 @@
+# Локально:   docker compose up -d
+# На VPS:     docker compose --profile prod up -d   (додає Caddy з автоматичним HTTPS)
+name: reform-monitor
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    image: ${APP_IMAGE:-reform-monitor:local}
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URI: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      PAYLOAD_SECRET: ${PAYLOAD_SECRET}
+      SITE_URL: ${SITE_URL:-http://localhost:3000}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      SEED_ON_START: ${SEED_ON_START:-false}
+      GOOGLE_SHEET_ID: ${GOOGLE_SHEET_ID:-}
+      ENABLE_JOBS: ${ENABLE_JOBS:-true}
+      REPO_URL: ${REPO_URL:-}
+    volumes:
+      - media:/app/media
+    ports:
+      # Типово лише localhost: назовні застосунок доступний тільки через Caddy.
+      # На спільному сервері без власного Caddy: APP_BIND=0.0.0.0 і вільний APP_PORT.
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/healthz >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      start_period: 40s
+      retries: 5
+
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["prod"]
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@example.com}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  # Службовий контейнер розробника: pnpm-команди з вихідного коду (типи, міграції, тести, seed).
+  #   docker compose --profile tools run --rm tools pnpm test
+  tools:
+    image: node:22-alpine
+    profiles: ["tools"]
+    working_dir: /app
+    entrypoint: ["sh", "-c", "corepack enable >/dev/null 2>&1; exec \"$$@\"", "--"]
+    command: ["pnpm", "--version"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URI: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      PAYLOAD_SECRET: ${PAYLOAD_SECRET}
+      GOOGLE_SHEET_ID: ${GOOGLE_SHEET_ID:-}
+      ENABLE_JOBS: "false"
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+      NEXT_TELEMETRY_DISABLED: "1"
+    volumes:
+      - .:/app
+      - tools_node_modules:/app/node_modules
+      - tools_pnpm_store:/root/.local/share/pnpm
+
+  # Playwright + axe проти запущеного контейнера app:
+  #   docker compose --profile test run --rm e2e
+  e2e:
+    image: mcr.microsoft.com/playwright:v1.65.1-noble
+    profiles: ["test"]
+    working_dir: /app
+    # Спільний мережевий простір із app: тести ходять на http://localhost:3000, як і в CI.
+    # (Походження збігається із SITE_URL — це потрібно для CSRF-перевірки входу в адмінку.)
+    network_mode: "service:app"
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      BASE_URL: http://localhost:3000
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      CI: "true"
+      npm_config_store_dir: /pnpm-store
+    entrypoint: ["sh", "-c", "npm install -g pnpm@10.34.9 >/dev/null 2>&1 && pnpm install --frozen-lockfile >/dev/null && exec \"$$@\"", "--"]
+    command: ["pnpm", "test:e2e"]
+    volumes:
+      - .:/app
+      - e2e_node_modules:/app/node_modules
+      - e2e_pnpm_store:/pnpm-store
+
+volumes:
+  pgdata:
+  media:
+  caddy_data:
+  caddy_config:
+  tools_node_modules:
+  tools_pnpm_store:
+  e2e_node_modules:
+  e2e_pnpm_store:
