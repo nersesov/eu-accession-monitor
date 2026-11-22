@@ -145,7 +145,21 @@ docker buildx build --platform linux/amd64 -t reform-monitor:local --load .
 docker save reform-monitor:local | gzip | ssh root@<IP> 'gunzip | docker load'
 ```
 
-Сайт у такому режимі працює по HTTP, тож пароль адміністратора передається відкрито. Для HTTPS додайте домен (або `reform-monitor.<IP>.sslip.io`) у конфігурацію наявного Caddy з `reverse_proxy` на цей порт, поверніть `APP_BIND=127.0.0.1` чи обмежте порт фаєрволом і змініть `SITE_URL` на `https://…`.
+Сайт у такому режимі працює по HTTP, тож пароль адміністратора передається відкрито. Щоб увімкнути HTTPS через наявний Caddy:
+
+1. Дізнайтеся адресу шлюзу мережі, в якій працює наявний Caddy: `docker inspect <caddy-контейнер> --format '{{range .NetworkSettings.Networks}}{{.Gateway}}{{end}}'` (наприклад, `172.18.0.1`).
+2. Допишіть блок у його Caddyfile. Якщо файл змонтовано в контейнер як окремий файл, дописуйте через `cat >>`, а не редактором, що створює новий файл, — інакше контейнер не побачить змін:
+
+```
+reform-monitor.<IP>.sslip.io {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=31536000"
+	reverse_proxy <шлюз>:<порт>
+}
+```
+
+3. Перевірте й застосуйте: `docker exec <caddy-контейнер> caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile`, далі те саме з `reload`.
+4. У `.env` застосунку: `SITE_URL=https://reform-monitor.<IP>.sslip.io`, `APP_BIND=<шлюз>` (порт перестає бути доступним ззовні), потім `docker compose up -d`.
 
 ## 7. Дані
 

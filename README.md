@@ -5,7 +5,7 @@ An independent open-source project: a platform for tracking the implementation o
 > **Independent demonstration project. Not an official resource of the authorities of Ukraine or the EU.**
 > Benchmark wording, measures, deadlines and statuses are **demonstration data**: they illustrate how the platform works and do not reflect the actual state of reforms.
 
-Demo: <http://185.67.0.246:8081>
+Demo: <https://reform-monitor.185.67.0.246.sslip.io>
 
 ![Home page](docs/screenshots/home.png)
 
