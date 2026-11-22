@@ -13,5 +13,11 @@ export default defineConfig({
     // Анімації вимкнено, щоб axe не аналізував проміжні кадри
     contextOptions: { reducedMotion: 'reduce' },
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    // Публічна частина додатково перевіряється у Firefox і WebKit (рушій Safari).
+    // Тести адмінки змінюють дані, тому виконуються лише в одному браузері.
+    { name: 'firefox', use: { ...devices['Desktop Firefox'] }, testIgnore: /admin\.spec\.ts/ },
+    { name: 'webkit', use: { ...devices['Desktop Safari'] }, testIgnore: /admin\.spec\.ts/ },
+  ],
 })
